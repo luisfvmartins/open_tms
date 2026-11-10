@@ -17,6 +17,7 @@ import { createHash, randomBytes } from 'crypto';
 import { authenticateCustomerJWT } from '../middleware/jwtAuth.js';
 import { attachOrgScopeFromCustomerUserHook } from '../auth/orgScopeMiddleware.js';
 import { CustomerWebhookDeliveryService } from '../services/webhooks/CustomerWebhookDeliveryService.js';
+import { SafeHttpClient } from '../security/SafeHttpClient.js';
 import { container, TOKENS } from '../di/index.js';
 import { ICommandBus } from '../commands/CommandBus.js';
 import { CREATE_API_KEY, UPDATE_API_KEY, DELETE_API_KEY, type CreateApiKeyResult } from '../commands/apiKeys/index.js';
@@ -265,6 +266,12 @@ export async function customerDeveloperRoutes(server: FastifyInstance) {
       return { data: null, error: `Unsupported event patterns: ${invalid.join(', ')}` };
     }
 
+    const urlCheck = await SafeHttpClient.validateUrlWithDns(body.url);
+    if (!urlCheck.valid) {
+      reply.code(400);
+      return { data: null, error: urlCheck.error || 'Prohibited or invalid webhook URL' };
+    }
+
     const orgId = req.orgId!;
     const result = await commandBus.dispatch({
       type: CREATE_CUSTOMER_WEBHOOK,
@@ -322,6 +329,14 @@ export async function customerDeveloperRoutes(server: FastifyInstance) {
 
     const existing = await server.prisma.customerWebhook.findFirst({ where: { id, customerId, orgId: req.orgId! }, select: { id: true } });
     if (!existing) { reply.code(404); return { data: null, error: 'Webhook not found' }; }
+
+    if (body.url) {
+      const urlCheck = await SafeHttpClient.validateUrlWithDns(body.url);
+      if (!urlCheck.valid) {
+        reply.code(400);
+        return { data: null, error: urlCheck.error || 'Prohibited or invalid webhook URL' };
+      }
+    }
 
     if (body.events) {
       const invalid = body.events.filter(e => !ALLOWED_EVENT_PATTERNS.includes(e));
@@ -446,7 +461,12 @@ export async function customerDeveloperRoutes(server: FastifyInstance) {
       orderBy: { createdAt: 'desc' },
       take: q.limit || 50,
     });
-    return { data: deliveries, error: null };
+    // Sanitize responseBody: mask failed deliveries and truncate successful responses to avoid internal reflection
+    const sanitizedDeliveries = deliveries.map(d => ({
+      ...d,
+      responseBody: d.status === 'delivered' && d.responseBody ? d.responseBody.slice(0, 500) : null,
+    }));
+    return { data: sanitizedDeliveries, error: null };
   });
 
   // ── EDI / Trading Partners ───────────────────────────────────────────

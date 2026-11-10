@@ -1,6 +1,17 @@
 import { ISkill, SkillDefinition, SkillExecutionParams, SkillExecutionResult } from './ISkill.js';
+import { SafeHttpClient, SSRFSecurityError } from '../../security/SafeHttpClient.js';
 
 export class CallWebhookSkill implements ISkill {
+  private httpClient: SafeHttpClient;
+
+  constructor(httpClient?: SafeHttpClient) {
+    this.httpClient = httpClient ?? new SafeHttpClient({
+      maxResponseBytes: 16384,
+      connectTimeoutMs: 5000,
+      requestTimeoutMs: 10000,
+    });
+  }
+
   readonly definition: SkillDefinition = {
     type: 'call_webhook',
     name: 'Call Webhook',
@@ -21,7 +32,14 @@ export class CallWebhookSkill implements ISkill {
 
   validateConfig(config: Record<string, unknown>): { valid: boolean; errors?: string[] } {
     const errors: string[] = [];
-    if (!config.url || typeof config.url !== 'string') errors.push('Webhook URL is required');
+    if (!config.url || typeof config.url !== 'string') {
+      errors.push('Webhook URL is required');
+    } else {
+      const urlCheck = SafeHttpClient.validateUrl(config.url);
+      if (!urlCheck.valid) {
+        errors.push(urlCheck.error || 'Prohibited or invalid webhook URL');
+      }
+    }
     return { valid: errors.length === 0, errors: errors.length > 0 ? errors : undefined };
   }
 
@@ -41,7 +59,7 @@ export class CallWebhookSkill implements ISkill {
     }
 
     try {
-      const response = await fetch(url, {
+      const response = await this.httpClient.request(url, {
         method,
         headers,
         body: params.fields.body ? String(params.fields.body) : undefined,
@@ -52,8 +70,11 @@ export class CallWebhookSkill implements ISkill {
         data: { statusCode: response.status, statusText: response.statusText },
         error: response.ok ? undefined : `HTTP ${response.status}: ${response.statusText}`,
       };
-    } catch (err) {
-      return { success: false, error: (err as Error).message };
+    } catch (err: any) {
+      const errorMsg = err instanceof SSRFSecurityError
+        ? 'Webhook delivery blocked: destination URL or resolved IP address is prohibited by security policy'
+        : (err instanceof Error ? err.message : String(err));
+      return { success: false, error: errorMsg };
     }
   }
 }

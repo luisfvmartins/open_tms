@@ -6,6 +6,7 @@
  */
 
 import { ITradingPartnerRepository, TradingPartnerWithTransactions } from '../repositories/TradingPartnerRepository.js';
+import { SafeHttpClient, SSRFSecurityError } from '../security/SafeHttpClient.js';
 
 export interface DeliveryResult {
   success: boolean;
@@ -35,7 +36,11 @@ export interface IOutboundEdiDeliveryService {
 }
 
 export class OutboundEdiDeliveryService implements IOutboundEdiDeliveryService {
-  constructor(private partnerRepo: ITradingPartnerRepository) {}
+  private safeClient: SafeHttpClient;
+
+  constructor(private partnerRepo: ITradingPartnerRepository, safeClient?: SafeHttpClient) {
+    this.safeClient = safeClient ?? new SafeHttpClient({ allowHttp: true, allowCustomPorts: true });
+  }
 
   async deliver(request: OutboundDeliveryRequest): Promise<DeliveryResult> {
     const partner = await this.partnerRepo.findById(request.partnerId, request.orgId);
@@ -199,7 +204,7 @@ export class OutboundEdiDeliveryService implements IOutboundEdiDeliveryService {
     }
 
     try {
-      const response = await fetch(partner.httpUrl!, {
+      const response = await this.safeClient.request(partner.httpUrl!, {
         method: 'POST',
         headers,
         body: request.ediContent,
@@ -213,11 +218,14 @@ export class OutboundEdiDeliveryService implements IOutboundEdiDeliveryService {
         errorMessage: response.ok ? undefined : `HTTP ${response.status}: ${response.statusText}`,
       };
     } catch (err: any) {
+      const errorMsg = err instanceof SSRFSecurityError
+        ? 'Outbound HTTP delivery blocked: destination address is prohibited by security policy'
+        : err.message;
       return {
         success: false,
         transport: 'http',
         destination: partner.httpUrl!,
-        errorMessage: err.message,
+        errorMessage: errorMsg,
       };
     }
   }

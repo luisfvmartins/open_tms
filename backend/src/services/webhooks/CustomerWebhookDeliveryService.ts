@@ -1,5 +1,6 @@
 import { PrismaClient, CustomerWebhook } from '@prisma/client';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { SafeHttpClient, SSRFSecurityError } from '../../security/SafeHttpClient.js';
 
 export interface DeliverInput {
   webhook: CustomerWebhook;
@@ -40,7 +41,15 @@ export function verifySignature(secret: string, header: string, body: string, to
 }
 
 export class CustomerWebhookDeliveryService {
-  constructor(private prisma: PrismaClient) {}
+  private httpClient: SafeHttpClient;
+
+  constructor(private prisma: PrismaClient, httpClient?: SafeHttpClient) {
+    this.httpClient = httpClient ?? new SafeHttpClient({
+      maxResponseBytes: 4000,
+      connectTimeoutMs: 5000,
+      requestTimeoutMs: 10000,
+    });
+  }
 
   async deliver(input: DeliverInput): Promise<{
     id: string;
@@ -78,34 +87,29 @@ export class CustomerWebhookDeliveryService {
     let deliveredAt: Date | null = null;
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10_000);
-      const res = await fetch(webhook.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-OpenTms-Event': eventType,
-          'X-OpenTms-Delivery': delivery.id,
-          'X-OpenTms-Signature': `t=${timestamp},v1=${signature}`,
-          'User-Agent': 'OpenTMS-Webhook/1.0',
-        },
-        body,
-        signal: controller.signal,
+      const res = await this.httpClient.post(webhook.url, JSON.parse(body), {
+        'Content-Type': 'application/json',
+        'X-OpenTms-Event': eventType,
+        'X-OpenTms-Delivery': delivery.id,
+        'X-OpenTms-Signature': `t=${timestamp},v1=${signature}`,
+        'User-Agent': 'OpenTMS-Webhook/1.0',
       });
-      clearTimeout(timeout);
       statusCode = res.status;
-      try {
-        const text = await res.text();
-        responseBody = text.slice(0, 4000);
-      } catch { /* ignore */ }
+      // Cap responseBody to safe preview length (up to 4000 characters)
+      responseBody = res.body ? res.body.slice(0, 4000) : null;
       if (res.ok) {
         status = 'delivered';
         deliveredAt = new Date();
       } else {
         errorMessage = `Endpoint responded with HTTP ${res.status}`;
       }
-    } catch (err) {
-      errorMessage = err instanceof Error ? err.message : String(err);
+    } catch (err: any) {
+      if (err instanceof SSRFSecurityError) {
+        errorMessage = 'Webhook delivery blocked: destination URL or resolved IP address is prohibited by security policy';
+      } else {
+        errorMessage = err instanceof Error ? err.message : String(err);
+      }
+      responseBody = null;
     }
 
     const [updatedDelivery] = await this.prisma.$transaction([
@@ -160,35 +164,29 @@ export class CustomerWebhookDeliveryService {
     let deliveredAt: Date | null = null;
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10_000);
-      const res = await fetch(webhook.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-OpenTms-Event': delivery.eventType,
-          'X-OpenTms-Delivery': delivery.id,
-          'X-OpenTms-Signature': `t=${timestamp},v1=${signature}`,
-          'X-OpenTms-Retry': String(delivery.attemptCount),
-          'User-Agent': 'OpenTMS-Webhook/1.0',
-        },
-        body,
-        signal: controller.signal,
+      const res = await this.httpClient.post(webhook.url, JSON.parse(body), {
+        'Content-Type': 'application/json',
+        'X-OpenTms-Event': delivery.eventType,
+        'X-OpenTms-Delivery': delivery.id,
+        'X-OpenTms-Signature': `t=${timestamp},v1=${signature}`,
+        'X-OpenTms-Retry': String(delivery.attemptCount),
+        'User-Agent': 'OpenTMS-Webhook/1.0',
       });
-      clearTimeout(timeout);
       statusCode = res.status;
-      try {
-        const text = await res.text();
-        responseBody = text.slice(0, 4000);
-      } catch { /* ignore */ }
+      responseBody = res.body ? res.body.slice(0, 4000) : null;
       if (res.ok) {
         status = 'delivered';
         deliveredAt = new Date();
       } else {
         errorMessage = `Endpoint responded with HTTP ${res.status}`;
       }
-    } catch (err) {
-      errorMessage = err instanceof Error ? err.message : String(err);
+    } catch (err: any) {
+      if (err instanceof SSRFSecurityError) {
+        errorMessage = 'Webhook delivery blocked: destination URL or resolved IP address is prohibited by security policy';
+      } else {
+        errorMessage = err instanceof Error ? err.message : String(err);
+      }
+      responseBody = null;
     }
 
     await this.prisma.$transaction([
