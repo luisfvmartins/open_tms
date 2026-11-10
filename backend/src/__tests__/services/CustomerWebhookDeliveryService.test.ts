@@ -144,4 +144,45 @@ describe('CustomerWebhookDeliveryService.deliver', () => {
     expect(result.status).toBe('failed');
     expect(result.errorMessage).toMatch(/ECONNREFUSED/);
   });
+
+  it('blocks SSRF delivery to 127.0.0.1 and sets responseBody to null', async () => {
+    const loopbackWebhook = { ...baseWebhook, url: 'https://127.0.0.1:8080/hook' };
+    const prisma = makePrisma();
+    const svc = new CustomerWebhookDeliveryService(prisma);
+
+    const result = await svc.deliver({ webhook: loopbackWebhook, eventType: 'rma.authorized', payload: {} });
+
+    expect(result.status).toBe('failed');
+    expect(result.deliveredAt).toBeNull();
+    expect(result.errorMessage).toMatch(/security policy|prohibited/i);
+    expect(prisma.customerWebhookDelivery.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'failed',
+          responseBody: null,
+          errorMessage: expect.stringMatching(/security policy/i),
+        }),
+      })
+    );
+  });
+
+  it('blocks SSRF delivery to 169.254.169.254 cloud metadata and masks error', async () => {
+    const metadataWebhook = { ...baseWebhook, url: 'https://169.254.169.254/latest/meta-data' };
+    const prisma = makePrisma();
+    const svc = new CustomerWebhookDeliveryService(prisma);
+
+    const result = await svc.deliver({ webhook: metadataWebhook, eventType: 'rma.authorized', payload: {} });
+
+    expect(result.status).toBe('failed');
+    expect(result.deliveredAt).toBeNull();
+    expect(result.errorMessage).toMatch(/security policy|prohibited/i);
+    expect(prisma.customerWebhookDelivery.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'failed',
+          responseBody: null,
+        }),
+      })
+    );
+  });
 });

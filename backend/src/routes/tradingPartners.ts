@@ -4,6 +4,7 @@ import { ITradingPartnerRepository } from '../repositories/TradingPartnerReposit
 import { IEdiRouterService } from '../services/EdiRouterService.js';
 import { container, TOKENS } from '../di/index.js';
 import { registerOrgScopeForEdi } from '../auth/orgScopeMiddleware.js';
+import { SafeHttpClient, SSRFSecurityError } from '../security/SafeHttpClient.js';
 
 export async function tradingPartnerRoutes(server: FastifyInstance) {
   const partnerRepo = container.resolve<ITradingPartnerRepository>(TOKENS.ITradingPartnerRepository);
@@ -349,10 +350,16 @@ export async function tradingPartnerRoutes(server: FastifyInstance) {
           headers[partner.httpAuthHeader] = partner.httpAuthValue;
         }
 
-        const response = await fetch(partner.httpUrl, {
+        const safeClient = new SafeHttpClient({
+          allowHttp: true,
+          allowCustomPorts: true,
+          connectTimeoutMs: 5000,
+          requestTimeoutMs: 10000,
+        });
+
+        const response = await safeClient.request(partner.httpUrl, {
           method: 'HEAD',
           headers,
-          signal: AbortSignal.timeout(10000),
         });
 
         return {
@@ -362,9 +369,12 @@ export async function tradingPartnerRoutes(server: FastifyInstance) {
           error: response.ok ? null : `HTTP returned ${response.status}`,
         };
       } catch (err: any) {
+        const errorMsg = err instanceof SSRFSecurityError
+          ? 'HTTP connection test blocked: destination URL or resolved IP is prohibited by security policy'
+          : err.message;
         return {
-          data: { http: { success: false, url: partner.httpUrl, error: err.message } },
-          error: `HTTP connection failed: ${err.message}`,
+          data: { http: { success: false, url: partner.httpUrl, error: errorMsg } },
+          error: `HTTP connection failed: ${errorMsg}`,
         };
       }
     }
