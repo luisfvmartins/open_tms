@@ -1,0 +1,184 @@
+%% ============================================================================
+%% OPEN TMS - DIAGRAMAS DE ARQUITETURA ATUAL E FLUXO DE SEGURANÇA
+%% Auditoria Técnica Preparatória para SaaS Brasileiro
+%% ============================================================================
+
+%% ----------------------------------------------------------------------------
+%% DIAGRAMA 1: ARQUITETURA GERAL DO SISTEMA (CONTAINERS, SERVIÇOS E PERSISTÊNCIA)
+%% ----------------------------------------------------------------------------
+flowchart TD
+    subgraph CLIENTS["Clientes / Camada de Apresentação"]
+        WEB_APP["Frontend Desktop SPA (React 18 + Vite + Tailwind + Radix)<br/>Porta: 5173 / 80 (Docker: 8080)"]
+        WMS_PWA["Warehouse PWA (Dock / Warehouse Mobile)<br/>Rotas /warehouse/*"]
+        INV_PWA["Inventory App (Mobile PWA)<br/>Rotas /inventory-app/*"]
+        CUST_PORTAL["Customer Portal<br/>Rotas /customer-portal/*"]
+        CARR_PORTAL["Carrier Portal<br/>Rotas /carrier-portal/*"]
+        EXT_CLIENTS["Sistemas Externos / Parceiros EDI<br/>Webhooks & Ingestão"]
+    end
+
+    subgraph INGRESS["Roteamento e Proxy"]
+        CORS_FILTER["Filtro CORS / Multipart Plugin"]
+        FASTIFY_ROUTER["Fastify 4.28 Router (index.ts)"]
+        WMS_PROXY["WmsServiceProxy Plugin<br/>(Forwarding /api/v1/wms/* para .NET)"]
+    end
+
+    subgraph BACKEND_API["Backend Principal (Node.js 24 + TypeScript) - Porta 3001"]
+        direction TB
+        subgraph AUTH_MIDDLEWARE["Camada de Autenticação & Escopo"]
+            JWT_AUTH["authenticateJWT (Bearer HS256)"]
+            ORG_SCOPE["registerStrictOrgScope / req.orgId"]
+            PORTAL_AUTH["Customer/Carrier Portal Auth Hooks"]
+        end
+
+        subgraph MODULES["Módulos de Domínio Fastify"]
+            MOD_CORE["Core (Tenancy, Users, Roles, Documents, Issues)"]
+            MOD_TMS["TMS (Shipments, Orders, Lanes, Consolidation, Tenders)"]
+            MOD_FIN["Finance (Invoices, Quotes, Charges, Payments)"]
+            MOD_INV["Inventory (Observations, Allocations, UOM)"]
+            MOD_QUAL["Quality (CAPA, SOP Checklists, Audits)"]
+            MOD_EDI["EDI & Tracking (X12, GPS, Webhooks, Integrations)"]
+        end
+
+        subgraph CQRS_LAYER["Arquitetura CQRS & Event-Driven"]
+            CMD_BUS["Command Bus (Create/Update/Delete Handlers)"]
+            EVENT_PERSIST["Persistência Outbox em DomainEventLog"]
+            EVENT_BUS_PUB["PgBossEventBus Publisher"]
+        end
+    end
+
+    subgraph WORKER_SERVICE["Processo Worker Dedicado (worker.ts)"]
+        PGBOSS_SUB["pg-boss Consumer / Queue Workers"]
+        PROJECTIONS["Projeções de Leitura (CQRS Read Models)"]
+        EVENT_HANDLERS["Handlers: Notificações, Webhooks, Auditoria"]
+        CRON_SERVICES["Crons: ETA Monitor, Cutoff, SLA, Auto-Archive, Faturamento"]
+        AGENT_TRIAGE["Agente de Triagem AI (Anthropic Claude - Chave Global)"]
+        SKILLS_ENGINE["Skill Registry (Webhook, Email, Issues, Escalation)"]
+    end
+
+    subgraph DOTNET_WMS["Microsserviço FinnWMS (.NET 8 C#) - Porta 5080"]
+        WMS_API["Minimal APIs / OpenAPI"]
+        WMS_HANDLERS["WMS Core Operations (Receiving, Putaway, Pick, Pack)"]
+        WMS_DAPPER["Dapper + SQL Direto (Schema: wms)"]
+        WMS_RLS["PostgreSQL Row Level Security (RLS Ativo)"]
+    end
+
+    subgraph EDI_COLLECTOR["Serviço Auxiliar: EDI Collector"]
+        SFTP_POLLER["Poller de SFTP/FTP para Ingestão X12"]
+    end
+
+    subgraph STORAGE_LAYER["Camada de Armazenamento & Banco de Dados"]
+        POSTGRES[("PostgreSQL 16 Engine")]
+        subgraph PG_SCHEMAS["Tabelas PostgreSQL"]
+            CORE_TABLES["Tabelas Transacionais Principais (Prisma)"]
+            READ_MODELS["Tabelas ReadModel (CQRS Denormalizado)"]
+            EVENT_STORE["DomainEventLog (Outbox/Histórico)"]
+            PGBOSS_TABLES["Schema pgboss (Filas e Agendamentos)"]
+            WMS_SCHEMA["Schema wms (Tabelas Isoladas FinnWMS)"]
+        end
+        MINIO_S3[("MinIO S3 / AWS S3 Compatível<br/>Portas: 9000 (API) / 9001 (Console)")]
+        FALLBACK_BINARY[("BinaryStore (Fallback BLOB no PostgreSQL)")]
+    end
+
+    subgraph EXT_SERVICES["Serviços e Provedores Externos"]
+        MAPS_SVC["Google Maps / TomTom / Here / Valhalla (Roteamento & Geocoding)"]
+        CARRIER_APIS["EasyPost / FedEx / UPS / DHL / AfterShip (Rastreamento)"]
+        LLM_SVC["Anthropic API (Claude 3.5 Sonnet / Haiku)"]
+        SMTP_SVC["Servidor SMTP / SendGrid / AWS SES (Envio de E-mails)"]
+    end
+
+    %% Relacionamentos de Entrada
+    WEB_APP -->|"HTTP / REST (JWT Bearer)"| CORS_FILTER
+    WMS_PWA -->|"HTTP / REST (Warehouse JWT)"| CORS_FILTER
+    INV_PWA -->|"HTTP / REST (Inventory JWT)"| CORS_FILTER
+    CUST_PORTAL -->|"HTTP / REST (Customer JWT)"| CORS_FILTER
+    CARR_PORTAL -->|"HTTP / REST (Carrier JWT)"| CORS_FILTER
+    EXT_CLIENTS -->|"HTTP Webhooks (X-API-Key / Inbound EDI)"| CORS_FILTER
+    EDI_COLLECTOR -->|"POST /api/v1/edi/inbound"| CORS_FILTER
+
+    %% Roteamento
+    CORS_FILTER --> FASTIFY_ROUTER
+    FASTIFY_ROUTER -->|"/api/v1/wms/*"| WMS_PROXY
+    WMS_PROXY -->|"Reverse Proxy HTTP"| WMS_API
+    FASTIFY_ROUTER --> AUTH_MIDDLEWARE
+    AUTH_MIDDLEWARE --> MODULES
+
+    %% Execução de Comandos e Eventos
+    MODULES --> CMD_BUS
+    CMD_BUS -->|"1. Grava Entidade + Outbox no mesmo Tx"| CORE_TABLES
+    CMD_BUS -->|"2. Dispara Notificação"| EVENT_BUS_PUB
+    EVENT_BUS_PUB -->|"Job de Despacho"| PGBOSS_TABLES
+
+    %% Processamento Worker
+    PGBOSS_TABLES -->|"Polling / SKIP LOCKED"| PGBOSS_SUB
+    PGBOSS_SUB --> PROJECTIONS
+    PGBOSS_SUB --> EVENT_HANDLERS
+    PGBOSS_SUB --> CRON_SERVICES
+    PGBOSS_SUB --> AGENT_TRIAGE
+    AGENT_TRIAGE --> SKILLS_ENGINE
+
+    %% Atualização dos Read Models
+    PROJECTIONS -->|"Grava Snapshot Denormalizado"| READ_MODELS
+    MODULES -->|"Consultas Otimizadas (findMany)"| READ_MODELS
+
+    %% Microsserviço .NET
+    WMS_API --> WMS_HANDLERS
+    WMS_HANDLERS --> WMS_DAPPER
+    WMS_DAPPER --> WMS_RLS
+    WMS_RLS --> WMS_SCHEMA
+
+    %% Armazenamento de Arquivos
+    MODULES -.->|"Upload/Download Arquivos"| MINIO_S3
+    MODULES -.->|"Fallback se S3 indisponível"| FALLBACK_BINARY
+    WORKER_SERVICE -.->|"Armazena PDFs / BOLs gerados"| MINIO_S3
+
+    %% Integrações Externas
+    MODULES -.->|"Geocoding & Distância"| MAPS_SVC
+    CRON_SERVICES -.->|"Polling de Status"| CARRIER_APIS
+    AGENT_TRIAGE -.->|"Invocação LLM"| LLM_SVC
+    EVENT_HANDLERS -.->|"Notificações"| SMTP_SVC
+
+
+%% ----------------------------------------------------------------------------
+%% DIAGRAMA 2: FLUXO DE AUTENTICAÇÃO, AUTORIZAÇÃO E ISOLAMENTO MULTI-TENANT
+%% ----------------------------------------------------------------------------
+sequenceDiagram
+    autonumber
+    actor User as Usuário / Cliente
+    participant Browser as Frontend (LocalStorage)
+    participant Fastify as Fastify Router (index.ts)
+    participant AuthMW as onRequest: authenticateJWT
+    participant OrgMW as preHandler: registerStrictOrgScope
+    participant Route as Endpoint do Módulo (ex: shipments.ts)
+    participant Prisma as Prisma Client
+    participant DB as PostgreSQL Database
+
+    Note over User, DB: 1. FLUXO DE LOGIN E OBTENÇÃO DO TOKEN
+    User->>Browser: Informa email e senha
+    Browser->>Fastify: POST /api/v1/auth/login { email, password }
+    Fastify->>Prisma: user.findFirst({ where: { email } })
+    Prisma->>DB: SELECT * FROM "User" WHERE email = $1
+    DB-->>Prisma: Registro de Usuário + Roles + Permissões
+    Note over Fastify: Valida HMAC-SHA256 da senha<br/>Gera JWT stateless (HS256, exp: 12h)<br/>Claims: sub, email, roles, permissions, organizationId
+    Fastify-->>Browser: { data: { token: "eyJ...", user: {...} } }
+    Browser->>Browser: Armazena em localStorage (auth_token)
+
+    Note over User, DB: 2. REQUISIÇÃO AUTENTICADA E ISOLAMENTO DE TENANT
+    User->>Browser: Acessa tela de Embarques
+    Browser->>Fastify: GET /api/v1/shipments<br/>Header: Authorization: Bearer eyJ...
+    
+    Fastify->>AuthMW: onRequest Hook executa
+    Note over AuthMW: Valida assinatura HMAC com JWT_SECRET<br/>Valida expiração (exp * 1000 > now)<br/>Decodifica claims: req.user = payload
+    AuthMW-->>Fastify: Autenticado com sucesso (ou 401 se inválido)
+
+    Fastify->>OrgMW: preHandler Hook executa (registerStrictOrgScope)
+    Note over OrgMW: attachOrgScopeHook:<br/>1. req.orgId = req.user.organizationId<br/>2. Se ausente, busca se há única organização<br/>requireOrgScope:<br/>Se req.orgId == null, rejeita com 401!
+    OrgMW-->>Fastify: req.orgId garantido no contexto
+
+    Fastify->>Route: Executa handler da rota
+    Note over Route: Route injeta filtro:<br/>where: { orgId: req.orgId, ... }
+    Route->>Prisma: shipmentReadModel.findMany({ where: { orgId, status: ... } })
+    Prisma->>DB: SELECT * FROM "ShipmentReadModel" WHERE "orgId" = $1 AND ...
+    DB-->>Prisma: Apenas registros do tenant correspondente
+    Prisma-->>Route: Registros isolados
+    Route-->>Browser: HTTP 200 { data: [ shipments... ] }
+    Browser-->>User: Renderiza tela com dados do tenant

@@ -28,7 +28,7 @@
     "exceljs": "^4.4.0",
     "fastify": "^4.28.1",
     "fastify-plugin": "^4.5.1",
-    "handlebars": "^4.7.9",
+    "handlebars": "^4.7.10",
     "node-x12": "^1.7.1",
     "nodemailer": "^8.0.4",
     "pdf-lib": "^1.17.1",

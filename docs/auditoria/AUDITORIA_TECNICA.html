@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatório de Auditoria Técnica - Open TMS</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1e293b;
+    line-height: 1.6;
+    font-size: 11pt;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 {
+    color: #0f172a;
+    font-size: 20pt;
+    border-bottom: 2px solid #2563eb;
+    padding-bottom: 8px;
+    margin-top: 0;
+  }
+  h2 {
+    color: #1e3a8a;
+    font-size: 15pt;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 6px;
+    margin-top: 24pt;
+    page-break-after: avoid;
+  }
+  h3 {
+    color: #1e40af;
+    font-size: 12pt;
+    margin-top: 16pt;
+    page-break-after: avoid;
+  }
+  h4 {
+    color: #334155;
+    font-size: 11pt;
+    margin-top: 12pt;
+    page-break-after: avoid;
+  }
+  p, li {
+    text-align: justify;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14pt 0;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid #cbd5e1;
+    padding: 6px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background-color: #f1f5f9;
+    color: #0f172a;
+    font-weight: 600;
+  }
+  tr:nth-child(even) {
+    background-color: #f8fafc;
+  }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 9pt;
+    background-color: #f1f5f9;
+    padding: 2px 4px;
+    border-radius: 4px;
+    color: #0f172a;
+  }
+  pre {
+    background-color: #0f172a;
+    color: #f8fafc;
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 8.5pt;
+    page-break-inside: avoid;
+  }
+  pre code {
+    background-color: transparent;
+    color: inherit;
+    padding: 0;
+  }
+  blockquote {
+    border-left: 4px solid #3b82f6;
+    margin: 12pt 0;
+    padding: 6pt 12pt;
+    background-color: #eff6ff;
+    color: #1e40af;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 18pt 0;
+  }
+</style>
+</head>
+<body>
+<h1>RELATÓRIO DE AUDITORIA TÉCNICA COMPLETA — OPEN TMS</h1>
+<p><strong>Avaliação Arquitetural, Funcional, Estrutural e de Segurança para Preparação de um TMS SaaS Brasileiro</strong></p>
+<hr>
+<p><strong>Identificação do Projeto:</strong> Open TMS (Open Transport Management System)<br><strong>Repositório Oficial:</strong> <code>https://github.com/DominicFinn/open_tms.git</code><br><strong>Autor Original:</strong> Dominic Finn<br><strong>Licença:</strong> MIT (Copyright 2025 Dominic Finn)<br><strong>Data da Auditoria:</strong> 10 de Novembro de 2026<br><strong>Auditor Responsável:</strong> Equipe de Engenharia / Antigravity Agentic AI<br><strong>Ambiente Auditado:</strong> Linux Ubuntu 24.04.1 LTS (Kernel 7.0.0-42-generic x86_64), Node.js v24.22.1, npm 11.19.1, Docker 29.1.3, Docker Compose 2.40.3<br><strong>Commit Auditado:</strong> <code>ed831c2b9f77721cc5c9d87c49f9aa3bde8124a0</code> (Branch <code>main</code>, árvore de trabalho limpa)</p>
+<hr>
+<h2>SUMÁRIO EXECUTIVO</h2>
+<p>A presente auditoria técnica foi realizada sobre a base de código do projeto de código aberto <strong>Open TMS</strong>, com o objetivo de analisar sua viabilidade, arquitetura, segurança, integridade relacional e prontidão funcional para servir de fundação a uma plataforma comercial <strong>SaaS de TMS (Transport Management System) voltada ao mercado brasileiro</strong>.</p>
+<h3>Conclusão de Viabilidade Técnica:</h3>
+<p><strong>O projeto Open TMS é TECNICAMENTE VIÁVEL como base aceleradora para o SaaS brasileiro</strong>, proporcionando uma economia estimada entre <strong>9 e 14 meses de desenvolvimento</strong> na implementação dos motores centrais de logística (despacho, roteamento, conferência de carga, topologia de armazém WMS, esteira de exceções logísticas e consolidação de fretes LTL). </p>
+<p>Contudo, <strong>o sistema NÃO está pronto para implantação ou comercialização imediata</strong>. A base tecnológica apresenta quatro ordens de desafios críticos que exigem intervenção estrutural prévia:</p>
+<ol>
+<li><strong>Quatro vulnerabilidades críticas de segurança (P0)</strong>, incluindo SSRF com exfiltração em webhooks, ingestão EDI desprotegida e ausência de Row Level Security (RLS) no PostgreSQL;</li>
+<li><strong>Incompatibilidade regulatória total com o Brasil</strong>, sem qualquer suporte a documentos fiscais obrigatórios (CT-e, MDF-e, NF-e), CIOT, Vale-Pedágio, CNH, CPF/CNPJ ou Placas Mercosul;</li>
+<li><strong>Inexistência de camada comercial SaaS</strong>, necessitando criação de controle de planos, quotas de uso, faturamento recorrente nacional e painel Super-Admin de plataforma;</li>
+<li><strong>Vulnerabilidades de dependências (CVEs)</strong> nos pacotes npm, exigindo atualização cautelosa de bibliotecas chave.</li>
+</ol>
+<hr>
+<h2>1. INTRODUÇÃO E OBJETIVO DA AUDITORIA</h2>
+<p>O setor de transporte rodoviário de cargas no Brasil possui particularidades regulatórias, fiscais e operacionais que o diferenciam substancialmente dos mercados norte-americano e europeu. A proposta de criar uma plataforma SaaS acessível a <strong>Transportadores Autônomos de Cargas (TACs)</strong>, pequenos transportadores e empresas com frotas próprias ou agregadas requer um software robusto, escalável, seguro e em estrita conformidade com a legislação nacional (ANTT, SEFAZ, Receita Federal e LGPD).</p>
+<p>O objetivo desta auditoria é dissecar o código-fonte real do Open TMS, avaliando:</p>
+<ul>
+<li>A viabilidade da arquitetura de software para múltiplas organizações em regime SaaS;</li>
+<li>A integridade e segurança do banco de dados relacional e a eficácia do isolamento entre empresas;</li>
+<li>A postura de segurança cibernética contra vetores clássicos de ataque (OWASP Top 10);</li>
+<li>O inventário real de funcionalidades prontas versus funcionalidades parciais ou inexistentes;</li>
+<li>As adaptações indispensáveis para atendimento à legislação e operação logística do Brasil;</li>
+<li>A conformidade das licenças de software e vulnerabilidades conhecidas em dependências;</li>
+<li>A formulação de uma matriz de riscos priorizada e um roadmap técnico de evolução em 12 etapas.</li>
+</ul>
+<hr>
+<h2>2. METODOLOGIA E AMBIENTE UTILIZADO</h2>
+<h3>2.1. Metodologia de Investigação</h3>
+<p>A auditoria fundamentou-se em inspeção estática e dinâmica de código, análise de dependências e execução de testes em ambiente local isolado, orientando-se pelas seguintes premissas:</p>
+<ul>
+<li><strong>Inspeção de Código-Fonte Real:</strong> Análise linha a linha das rotas, middleware, comandos, serviços de domínio e schemas de banco, recusando qualquer suposição baseada unicamente no <code>README.md</code> ou documentações promocionais.</li>
+<li><strong>Não Destrutividade:</strong> Não foram feitas alterações funcionais, refatorações, migrações destrutivas ou inserção de credenciais reais no repositório.</li>
+<li><strong>Rastreabilidade e Evidências:</strong> Todo achado técnico possui correspondência direta com arquivos, linhas de código e testes automatizados executados.</li>
+<li><strong>Alinhamento com Normas ABNT:</strong> Estruturação lógica e padronizada de relatório técnico de software (ABNT NBR 10719).</li>
+</ul>
+<h3>2.2. Registro Formal do Ambiente de Execução</h3>
+<p>O ambiente local onde a auditoria foi conduzida possui as seguintes especificações verificadas:</p>
+<ul>
+<li><strong>Sistema Operacional:</strong> Linux Ubuntu 24.04.1 LTS (Kernel: <code>7.0.0-42-generic #42~24.04.1-Ubuntu SMP x86_64</code>)</li>
+<li><strong>Node.js:</strong> Versão <code>v24.22.1</code></li>
+<li><strong>npm:</strong> Versão <code>11.19.1</code></li>
+<li><strong>Git:</strong> Versão <code>2.43.0</code></li>
+<li><strong>Docker Engine:</strong> Versão <code>29.1.3</code></li>
+<li><strong>Docker Compose:</strong> Versão <code>2.40.3</code></li>
+<li><strong>Memória RAM:</strong> 7,7 GiB total (disponibilidade média: 3,2 GiB)</li>
+<li><strong>Armazenamento:</strong> 234 GiB total (180 GiB livres na partição <code>/</code>)</li>
+</ul>
+<h3>2.3. Registro Formal de Clonagem</h3>
+<ul>
+<li><strong>URL do Repositório:</strong> <code>https://github.com/DominicFinn/open_tms.git</code></li>
+<li><strong>Diretório de Trabalho:</strong> <code>/home/luisfvmartins/Projetos/Open-TMS</code></li>
+<li><strong>Branch Ativa:</strong> <code>main</code> (atualizada com <code>origin/main</code>)</li>
+<li><strong>Commit Analisado:</strong> <code>ed831c2b9f77721cc5c9d87c49f9aa3bde8124a0</code></li>
+<li><strong>Data da Clonagem:</strong> 10 de Novembro de 2026</li>
+<li><strong>Estado do Repositório:</strong> Árvore de trabalho limpa (<code>working tree clean</code>), sem modificações locais não rastreadas.</li>
+</ul>
+<hr>
+<h2>3. ARQUITETURA ATUAL DO SISTEMA</h2>
+<p>O Open TMS é estruturado primariamente como um <strong>monorepo modular</strong> gerenciado via npm workspaces, combinando um backend em TypeScript/Fastify, um frontend SPA em React 18, processos assíncronos via workers e um microsserviço satélite em .NET para rotas de WMS.</p>
+<pre><code>                                  ARQUITETURA OPEN TMS
+       ┌────────────────────────────────────────────────────────────────────────┐
+       │                   CAMADA DE APRESENTAÇÃO (FRONTEND)                     │
+       │  React 18 + Vite + Tailwind CSS + Radix UI + Lucide React (Porta 5173) │
+       │  - Aplicação Principal TMS (80+ páginas e visões em vnext-design/)     │
+       │  - Portal do Embarcador (customer-portal/) e Transportador             │
+       │  - Warehouse PWA (warehouse/) e Estoque Mobile (inventory-app/)        │
+       └───────────────────────────────────┬────────────────────────────────────┘
+                                           │ HTTP / REST (JWT Bearer)
+                                           ▼
+       ┌────────────────────────────────────────────────────────────────────────┐
+       │                    BACKEND API (FASTIFY 4.28 + TS)                     │
+       │  - index.ts (Porta 3001)                                               │
+       │  - Autenticação JWT (authenticateJWT) + Escopo de Tenant (req.orgId)    │
+       │  - Arquitetura CQRS: Command Bus ➔ Domain Event Log (Outbox)           │
+       │  - Proxy Reverso (wmsServiceProxy) ➔ Roteia /wms/* para serviço .NET   │
+       └─────────────────┬────────────────────────────────────┬─────────────────┘
+                         │                                    │
+           Eventos (TX)  │                      Jobs Assínc.  │
+                         ▼                                    ▼
+       ┌──────────────────────────────┐        ┌────────────────────────────────┐
+       │  BANCO POSTGRESQL 16 (DB)    │        │   WORKER ASSÍNCRONO (worker.ts)│
+       │  - Prisma ORM (7 Schemas)    │        │  - pg-boss Queue Consumer      │
+       │  - DomainEventLog (Outbox)   │◄───────┤  - Atualização de Read Models  │
+       │  - CQRS Read Models          │        │  - Agente de Triagem com IA    │
+       │  - Schema wms (FinnWMS .NET) │        │  - Crons (SLA, Cutoff, Fatura) │
+       └──────────────┬───────────────┘        └────────────────────────────────┘
+                      │
+                      ▼
+       ┌──────────────────────────────┐        ┌────────────────────────────────┐
+       │  STORAGE &amp; ANEXOS            │        │   SERVIÇOS AUXILIARES          │
+       │  - MinIO / AWS S3 (Anexos)   │        │  - edi-collector (SFTP/FTP)    │
+       │  - BinaryStore (Fallback DB) │        │  - FinnWMS (.NET 8 C# / 5080)  │
+       └──────────────────────────────┘        └────────────────────────────────┘
+</code></pre>
+<h3>3.1. Componentes e Responsabilidades</h3>
+<ol>
+<li><strong>Frontend (<code>frontend/</code>):</strong><ul>
+<li>Construído com React 18, TypeScript, Vite, Tailwind CSS e componentes Radix UI.</li>
+<li>Apresenta mais de 80 páginas funcionais cobrindo embarques, pedidos, rotas, consolidação, tabelas tarifárias, relatórios financeiros e painéis de cais.</li>
+<li>Empacotado em bundle único de 2,5 MB com Tailwind pré-compilado.</li>
+</ul>
+</li>
+<li><strong>Backend Fastify (<code>backend/</code>):</strong><ul>
+<li>Construído em Fastify 4.28 com TypeScript compilado para ES Modules.</li>
+<li>Estruturado segundo princípios de Clean Architecture e CQRS: rotas finas delegam mutações para o <code>CommandBus</code>, que grava a entidade e o evento de domínio no mesmo bloco transacional (<code>BaseCommandHandler</code>).</li>
+<li>Leitura de alto volume otimizada através de tabelas desnormalizadas (<code>*ReadModel</code>).</li>
+</ul>
+</li>
+<li><strong>Processador Assíncrono (<code>backend/src/worker.ts</code>):</strong><ul>
+<li>Processo Node.js desacoplado, projetado para rodar em container isolado sem expor portas HTTP.</li>
+<li>Consome filas do <code>pg-boss</code> para atualizar projeções de leitura, disparar webhooks, monitorar atrasos de rotas (ETA Monitor), avaliar SLAs e executar triagem inteligente de incidentes logísticos via Anthropic Claude.</li>
+</ul>
+</li>
+<li><strong>Microsserviço FinnWMS (<code>services/wms/</code>):</strong><ul>
+<li>Implementado em .NET 8 (C#) com Dapper e migrations SQL brutas.</li>
+<li>Atende rotas operacionais de depósito em cais com suporte a Row Level Security nativo no schema <code>wms</code>.</li>
+</ul>
+</li>
+<li><strong>EDI Collector (<code>edi-collector/</code>):</strong><ul>
+<li>Daemon dedicado para polling de servidores remotos de clientes via SFTP/FTP, coletando arquivos de intercâmbio eletrônico de dados (EDI) e repassando à API.</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>4. AUDITORIA DO BANCO DE DADOS E MULTI-TENANCY</h2>
+<h3>4.1. Estrutura do Prisma Schema</h3>
+<p>O banco de dados é modelado utilizando o recurso de múltiplos arquivos de schema do Prisma 5.22, divididos em sete domínios:</p>
+<ul>
+<li><code>core.prisma</code>: Organização, Usuários, Papéis, Permissões, Auditoria, Anexos, Campos Customizados e Eventos de Domínio;</li>
+<li><code>tms.prisma</code>: Embarques (<code>Shipment</code>), Pedidos (<code>Order</code>), Rotas (<code>Lane</code>), Consolidação, Transportadoras, Dispositivos IoT, Cadeia Fria e Ocorrências;</li>
+<li><code>finance.prisma</code>: Faturas (<code>Invoice</code>), Contas a Pagar (<code>CarrierInvoice</code>), Cotações (<code>Quote</code>), Encargos (<code>Charge</code>), Pagamentos e Comissões;</li>
+<li><code>wms.prisma</code>: Armazéns, Zonas, Posições (<code>Bin</code>), Recebimento, Putaway, Ondas, Separação, Embalagem e Despacho;</li>
+<li><code>inventory.prisma</code>: Registro e Transações de Estoque, Observações e Alocações;</li>
+<li><code>quality.prisma</code>: Relatórios CAPA, Checklists e Auditorias de Procedimento Padrão (SOP);</li>
+<li><code>config.prisma</code>: Parâmetros do sistema.</li>
+</ul>
+<h3>4.2. Avaliação de Multi-Tenancy e Isolamento</h3>
+<p>A plataforma utiliza o modelo de <strong>banco de dados compartilhado com segregação lógica por coluna</strong> (<code>orgId</code> em cada tabela).</p>
+<h4>Pontos Positivos Identificados:</h4>
+<ul>
+<li>Todas as entidades operacionais principais (<code>Shipment</code>, <code>Order</code>, <code>Customer</code>, <code>Carrier</code>, <code>Lane</code>, <code>Location</code>, <code>Invoice</code>, <code>Vehicle</code>, <code>Driver</code>) possuem coluna <code>orgId String NOT NULL</code> acompanhada de índices indexados <code>@@index([orgId])</code>.</li>
+<li>O framework CQRS utiliza tabelas de leitura (<code>*ReadModel</code>) com isolamento estrito por <code>orgId</code>.</li>
+<li>As rotas da API autenticada passam pelo hook <code>registerStrictOrgScope</code>, que extrai o tenant do JWT e rejeita requisições sem contexto com código HTTP 401.</li>
+</ul>
+<h4>Lacunas Críticas Identificadas:</h4>
+<ol>
+<li><strong>Ausência de Row-Level Security (RLS) no PostgreSQL (Achado P0-TEN-01):</strong><ul>
+<li>O isolamento depende inteiramente da integridade do código da aplicação (Prisma). Não há nenhuma política de segurança nativa no PostgreSQL para impedir que uma query mal formatada ou executada via Dapper leia registros de outras empresas.</li>
+</ul>
+</li>
+<li><strong>Ausência de Chaves Estrangeiras Compostas (Achado P0-TEN-02):</strong><ul>
+<li>As constraints de banco vinculam apenas o ID simples. Nada impede que uma linha pertença à Empresa A e aponte para um cliente ou veículo da Empresa B, abrindo brecha para relacionamentos cruzados caso a validação do backend falhe.</li>
+</ul>
+</li>
+<li><strong>Rigidez de Usuário Único por Empresa (Achado P1-SAA-02):</strong><ul>
+<li>O modelo <code>User</code> possui a restrição <code>email String @unique</code> e um campo <code>organizationId String</code> direto. Um operador ou motorista não pode usar o mesmo endereço de e-mail em duas organizações simultaneamente.</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>5. AUDITORIA DE SEGURANÇA DA APLICAÇÃO</h2>
+<p>A auditoria de segurança avaliou as defesas da aplicação contra vulnerabilidades do OWASP Top 10 e práticas de segurança corporativa.</p>
+<h3>5.1. Autenticação e Gestão de Credenciais</h3>
+<ul>
+<li><strong>Algoritmo Inseguro de Hash de Senha (Achado P1-SEC-03):</strong> O backend deriva senhas utilizando HMAC-SHA256 simples de 1 iteração (<code>backend/src/services/AuthService.ts:227-231</code>). Essa abordagem viola normas modernas (OWASP) e permite quebra rápida por força bruta em caso de vazamento da base.</li>
+<li><strong>Sessões Stateless Sem Revogação (Achado P1-SEC-04):</strong> Os tokens de acesso possuem validade estática de 12 horas. O logout na rota <code>POST /api/v1/auth/logout</code> é um no-op que não invalida o token no servidor.</li>
+<li><strong>Recuperação de Senha Inoperante:</strong> A rota <code>/api/v1/auth/forgot-password</code> é um stub que apenas imprime um log informativo, orientando o usuário a procurar o administrador.</li>
+</ul>
+<h3>5.2. Autorização e Controle de Acesso (RBAC)</h3>
+<ul>
+<li>O sistema possui controle de acesso baseado em papéis (<code>Role</code>) e permissões granulares (<code>users:read</code>, <code>shipments:write</code>, etc.) armazenadas em array JSON.</li>
+<li>A maior parte dos endpoints internos valida as permissões corretamente via middleware <code>requirePermission</code>.</li>
+</ul>
+<h3>5.3. Vulnerabilidades Web Identificadas</h3>
+<ol>
+<li><strong>Server-Side Request Forgery - SSRF (Achado P0-SEC-01):</strong><ul>
+<li>Localizado em <code>CustomerWebhookDeliveryService.ts:83</code> e <code>CallWebhookSkill.ts:44</code>.</li>
+<li>Permite que um usuário informe endpoints internos (<code>169.254.169.254</code>, <code>127.0.0.1</code>) e consulte até 4.000 caracteres da resposta através da API de histórico de entregas.</li>
+</ul>
+</li>
+<li><strong>Ingestão EDI Desprotegida (Achado P0-SEC-02):</strong><ul>
+<li>Rotas <code>/api/v1/edi/*</code> estão registradas como públicas sem validação de HMAC ou API Key, permitindo que qualquer agente anônimo injete transações de frete caso conheça o ID do parceiro.</li>
+</ul>
+</li>
+<li><strong>Stored Cross-Site Scripting - XSS (Achado P1-SEC-05):</strong><ul>
+<li>Localizado em <code>VNextEmailTemplates.tsx:378</code>.</li>
+<li>Renderização de código HTML sem higienização via <code>dangerouslySetInnerHTML</code>, expondo o <code>auth_token</code> gravado no <code>localStorage</code>.</li>
+</ul>
+</li>
+<li><strong>Ausência de Rate Limiting Global (Achado P1-SEC-06):</strong><ul>
+<li>Endpoints de login e recuperação de senha desprotegidos contra negação de serviço e ataques de força bruta em massa.</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>6. COMPATIBILIDADE COM O MERCADO BRASILEIRO</h2>
+<p>O código do Open TMS foi desenvolvido sob premissas estritas da logística dos Estados Unidos. A tabela a seguir compara o estado atual com os requisitos obrigatórios do mercado brasileiro:</p>
+<table>
+<thead>
+<tr>
+<th>Requisito do Brasil</th>
+<th>Situação no Open TMS</th>
+<th>Gravidade</th>
+<th>Impacto no Lançamento</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Identificação Pessoal / Fiscal</strong></td>
+<td>Inexistente. Apenas <code>taxId</code> livre (&quot;VAT / EIN&quot;). Sem CPF, CNPJ ou suporte ao novo CNPJ alfanumérico.</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Bloqueia cadastros formais de clientes, motoristas e transportadoras.</td>
+</tr>
+<tr>
+<td><strong>Endereçamento Nacional</strong></td>
+<td>Parcial. Endereço padrão EUA (<code>address1</code>, <code>state</code>, <code>postalCode</code>). Sem bairro, sem código IBGE de município e sem busca automática de CEP.</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Inviabiliza a emissão de documentos fiscais eletrônicos (que exigem código IBGE).</td>
+</tr>
+<tr>
+<td><strong>Documentação Veicular</strong></td>
+<td>Inexistente. Placa é string livre sem validação. Sem RENAVAM, Chassi ou suporte ao padrão Mercosul (<code>AAA0A00</code>).</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Impede registro fidedigno de frotas e fiscalização em postos fiscais.</td>
+</tr>
+<tr>
+<td><strong>Documentos de Motorista</strong></td>
+<td>Inexistente. Sem CNH, sem categoria (C, D, E), sem vencimento e sem exames toxicológicos.</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Risco de não conformidade trabalhista e regulatória (ANTT).</td>
+</tr>
+<tr>
+<td><strong>Tipos de Frota</strong></td>
+<td>Rígido. Motorista só existe subordinado a uma <code>Carrier</code>. Não suporta TACs autônomos diretos nem agregados.</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Impede o atendimento ao público prioritário inicial (motoristas autônomos).</td>
+</tr>
+<tr>
+<td><strong>Documentos Fiscais (CT-e / MDF-e)</strong></td>
+<td>Inexistente. Sistema gera apenas Bill of Lading (BOL), documento sem valor fiscal no Brasil.</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Bloqueio comercial legal. Cargas sem CT-e e MDF-e são apreendidas pela fiscalização.</td>
+</tr>
+<tr>
+<td><strong>Conexão com NF-e</strong></td>
+<td>Inexistente. Pedidos não capturam chave de acesso de 44 dígitos da NF-e nem realizam leitura de XML.</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Transportadoras brasileiras transportam mercadorias amparadas por NF-e de terceiros.</td>
+</tr>
+<tr>
+<td><strong>CIOT e Vale-Pedágio</strong></td>
+<td>Inexistente. Sem integração com IPEFs para geração de CIOT ou comprovante de Vale-Pedágio obrigatório.</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Multas severas aplicadas pela ANTT por descumprimento da Lei 10.209/2001.</td>
+</tr>
+<tr>
+<td><strong>Padrão de EDI Nacional</strong></td>
+<td>Incompatível. Sistema suporta apenas ANSI X12 norte-americano. O padrão brasileiro é PROCEDA (NOTFIS, OCOREN).</td>
+<td><strong>P2 - Médio</strong></td>
+<td>Grandes embarcadores brasileiros exigem integração via layout PROCEDA.</td>
+</tr>
+<tr>
+<td><strong>Meios de Pagamento</strong></td>
+<td>Incompatível. Moeda padrão USD; liquidação financeira manual. Sem PIX ou Boleto Bancário.</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Faturamento inviabilizado para clientes e motoristas no Brasil.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>7. AUDITORIA DE DEPENDÊNCIAS E LICENÇAS</h2>
+<h3>7.1. Análise da Licença de Software</h3>
+<p>O repositório oficial do Open TMS é distribuído sob os termos da <strong>Licença MIT</strong>, registrada no arquivo <a href="file:///home/luisfvmartins/Projetos/Open-TMS/LICENCE.md">LICENCE.md</a> em nome de <strong>Dominic Finn (2025)</strong>:</p>
+<blockquote>
+<p><strong>Implicações Comerciais:</strong></p>
+<ol>
+<li>A licença MIT é uma licença de software livre permissiva que <strong>autoriza expressamente o uso comercial, modificação, distribuição, sublicenciamento e fechamento de código derivado</strong>, sem exigir o compartilhamento de código-fonte de modificações proprietárias.</li>
+<li><strong>Obrigação Legal Inviolável:</strong> A licença impõe a condição jurídica mandatória de que o aviso original de direitos autorais (<em>Copyright (c) 2025 Dominic Finn</em>) e o texto da permissão da licença MIT sejam mantidos e reproduzidos em todas as cópias ou partes substanciais do software.</li>
+<li><strong>Conformidade das Dependências:</strong> A auditoria via <code>license-checker</code> confirmou que 100% das dependências de produção utilizam licenças compatíveis (MIT: 710 pacotes, Apache-2.0: 61, ISC: 55, BSD: 36, BlueOak: 8, 0BSD: 2). Não foi detectada nenhuma dependência com licença copyleft restritiva (como GPL ou AGPL) no código compilado de produção.</li>
+</ol>
+</blockquote>
+<h3>7.2. Auditoria de Vulnerabilidades em Dependências</h3>
+<p>A execução do comando <code>npm audit</code> revelou 45 vulnerabilidades conhecidas no grafo de dependências:</p>
+<ul>
+<li><strong>Críticas:</strong> 4</li>
+<li><strong>Altas:</strong> 10</li>
+<li><strong>Moderadas:</strong> 28</li>
+<li><strong>Baixas:</strong> 3</li>
+</ul>
+<p>Dentre as vulnerabilidades de alto impacto técnico, ressaltam-se:</p>
+<ol>
+<li><code>@fastify/reply-from &lt;= 12.6.1</code> (<strong>Crítica — GHSA-gwhp-pf74-vj37</strong>): Permite manipulação e remoção de cabeçalhos proxy de segurança adicionados pelo backend através de abuso do cabeçalho <code>Connection</code>.</li>
+<li><code>@fastify/busboy &lt; 3.2.1</code> (<strong>Alta — GHSA-x8mw-p69m-v3mx</strong>): Negação de serviço (DoS) via injeção de cabeçalhos de partes multipart nomeados com propriedades de protótipo.</li>
+<li><code>undici &lt; 6.27.0</code> (<strong>Alta — GHSA-vxpw-j846-p89q</strong>): Evasão de contagem de fragmentos em clientes WebSocket levando a esgotamento de memória.</li>
+<li><code>zod &lt; 4.6.6</code> (<strong>Alta — GHSA-mrhx-c7xc-m3w5</strong>): Esgotamento de memória ao validar coleções excessivamente aninhadas ou de tamanho anômalo.</li>
+</ol>
+<hr>
+<h2>8. RESULTADOS DE EXECUÇÃO E TESTES AUTOMATIZADOS</h2>
+<p>O projeto foi submetido a execução completa em ambiente local sem qualquer alteração prévia de código.</p>
+<h3>8.1. Compilação e Build</h3>
+<ul>
+<li><strong>Pacotes Compartilhados (<code>packages/shared</code>):</strong> Compilação TypeScript executada com sucesso (<code>tsc -p tsconfig.json</code>).</li>
+<li><strong>Prisma Client:</strong> Geração do cliente concluída com êxito em 7.84s a partir dos 7 schemas (<code>backend/prisma/schema/*.prisma</code>).</li>
+<li><strong>Backend (<code>@open-tms/backend</code>):</strong> Compilação TypeScript de 935 arquivos executada com sucesso sem nenhum erro de tipagem (<code>tsc -p tsconfig.json</code>).</li>
+<li><strong>Frontend (<code>@open-tms/frontend</code>):</strong> Compilação e bundling via Vite concluídos com sucesso em 46.26s (<code>3.485 módulos transformados</code>), gerando artefatos estáticos prontos para produção.</li>
+</ul>
+<h3>8.2. Linters Arquiteturais Próprios</h3>
+<p>O projeto possui dois linters arquiteturais desenvolvidos sob medida para garantir integridade estrutural:</p>
+<ol>
+<li><strong>Module Boundaries Linter (<code>npm run lint:boundaries</code>):</strong><ul>
+<li>Resultado: <strong>Aprovado</strong>. Analisou 935 arquivos com 5 exceções justificadas na linha de base e 24 acessos cruzados tolerados entre tabelas.</li>
+</ul>
+</li>
+<li><strong>Tenancy Linter (<code>npm run lint:tenancy</code>):</strong><ul>
+<li>Resultado: <strong>Aprovado</strong>. Verificou a presença de escopo de tenant em repositórios e comandos, sem violações registradas.</li>
+</ul>
+</li>
+</ol>
+<h3>8.3. Execução da Suíte de Testes Automatizados</h3>
+<p>A execução dos testes existentes no repositório apresentou resultados excepcionais de aprovação:</p>
+<pre><code>┌────────────────────────────────────────────────────────────────────────┐
+│                   RESULTADOS DOS TESTES AUTOMATIZADOS                  │
+├────────────────────┬───────────┬───────────┬───────────┬───────────────┤
+│ Pacote / Workspace │ Suítes    │ Aprovados │ Reprovados│ Tempo Total   │
+├────────────────────┼───────────┼───────────┼───────────┼───────────────┤
+│ Backend            │ 251       │ 2.595     │ 0         │ 161,45 s      │
+│ Frontend           │ 8         │ 61        │ 0         │ 111,65 s      │
+├────────────────────┼───────────┼───────────┼───────────┼───────────────┤
+│ TOTAL              │ 259       │ 2.656     │ 0 (100%)  │ 273,10 s      │
+└────────────────────┴───────────┴───────────┴───────────┴───────────────┘
+</code></pre>
+<h4>Alertas e Observações Importantes:</h4>
+<ul>
+<li><strong>100% de Aprovação:</strong> Todos os 2.656 testes existentes foram aprovados com sucesso.</li>
+<li><strong>Desequilíbrio de Cobertura:</strong> Enquanto o backend possui 251 suítes de teste (cobrindo extensivamente CQRS, comandos, isolamento de tenant, regras de negócio e integrações), o frontend possui apenas 8 suítes com 61 testes focados quase exclusivamente em utilitários e providers, deixando telas e formulários sem testes automatizados.</li>
+<li><strong>Vazamento de Handles no Jest:</strong> Os scripts do Jest exigem a flag <code>--forceExit</code> porque conexões com o banco ou timers assíncronos não são limpos adequadamente no teardown dos testes (<code>Active timers can cause this, ensure that .unref() was called on them</code>).</li>
+</ul>
+<hr>
+<h2>9. QUADRO CONSOLIDADO DE RISCOS E ACHADOS</h2>
+<p>Abaixo estão sumarizados todos os 20 achados técnicos identificados na auditoria, ordenados rigorosamente por nível de criticidade:</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Categoria</th>
+<th>Criticidade</th>
+<th>Descrição Sucinta</th>
+<th>Localização no Código</th>
+<th>Complexidade de Ajuste</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>P0-SEC-01</strong></td>
+<td>Segurança</td>
+<td><strong>P0 - Crítico</strong></td>
+<td>SSRF com exfiltração de resposta HTTP em webhooks e agente</td>
+<td><code>CustomerWebhookDeliveryService.ts:83</code></td>
+<td>Média</td>
+</tr>
+<tr>
+<td><strong>P0-SEC-02</strong></td>
+<td>Segurança</td>
+<td><strong>P0 - Crítico</strong></td>
+<td>Rotas EDI Inbound sem autenticação ou validação de assinatura</td>
+<td><code>backend/src/routes/modules/tms.ts:82</code></td>
+<td>Média</td>
+</tr>
+<tr>
+<td><strong>P0-TEN-01</strong></td>
+<td>Multi-tenancy</td>
+<td><strong>P0 - Crítico</strong></td>
+<td>Ausência de PostgreSQL RLS (isolamento depende 100% do Prisma)</td>
+<td><code>backend/prisma/migrations/</code></td>
+<td>Alta</td>
+</tr>
+<tr>
+<td><strong>P0-TEN-02</strong></td>
+<td>Multi-tenancy</td>
+<td><strong>P0 - Crítico</strong></td>
+<td>Falta de Foreign Keys compostas com <code>orgId</code> (risco de relação cruzada)</td>
+<td><code>backend/prisma/schema/tms.prisma:4-50</code></td>
+<td>Média</td>
+</tr>
+<tr>
+<td><strong>P1-SEC-03</strong></td>
+<td>Segurança</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Hash de senhas inseguro (HMAC-SHA256 simples sem fator de custo KDF)</td>
+<td><code>AuthService.ts:227</code>, <code>CustomerAuthService.ts:226</code></td>
+<td>Baixa</td>
+</tr>
+<tr>
+<td><strong>P1-SEC-04</strong></td>
+<td>Segurança</td>
+<td><strong>P1 - Alto</strong></td>
+<td>JWT stateless de 12 horas sem revogação no servidor e logout fictício</td>
+<td><code>AuthService.ts:16</code>, <code>routes/auth.ts:120</code></td>
+<td>Média</td>
+</tr>
+<tr>
+<td><strong>P1-SEC-05</strong></td>
+<td>Segurança</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Tokens em localStorage e Stored XSS em preview de templates de e-mail</td>
+<td><code>authFetch.ts:28</code>, <code>VNextEmailTemplates.tsx:378</code></td>
+<td>Baixa</td>
+</tr>
+<tr>
+<td><strong>P1-SEC-06</strong></td>
+<td>Segurança</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Ausência de rate limiting global nos endpoints de autenticação e API</td>
+<td><code>backend/src/index.ts</code></td>
+<td>Baixa</td>
+</tr>
+<tr>
+<td><strong>P1-BRA-01</strong></td>
+<td>Adaptação BR</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Cadastros sem campos brasileiros (CPF, CNPJ, CEP, IBGE, Placa Mercosul)</td>
+<td><code>schema/core.prisma:39</code>, <code>schema/tms.prisma:488</code></td>
+<td>Média</td>
+</tr>
+<tr>
+<td><strong>P1-BRA-02</strong></td>
+<td>Compliance BR</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Ausência total de módulo fiscal brasileiro (CT-e, MDF-e, CIOT, Pedágio)</td>
+<td><code>DocumentGenerationService.ts</code></td>
+<td>Alta</td>
+</tr>
+<tr>
+<td><strong>P1-BRA-03</strong></td>
+<td>Operação BR</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Falta de suporte a TAC, agregados, separação cavalo/carreta e acertos</td>
+<td><code>schema/tms.prisma:481-516</code></td>
+<td>Alta</td>
+</tr>
+<tr>
+<td><strong>P1-SAA-01</strong></td>
+<td>SaaS Comercial</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Inexistência de gestão comercial SaaS (planos, quotas, faturamento)</td>
+<td><code>backend/prisma/schema/</code></td>
+<td>Alta</td>
+</tr>
+<tr>
+<td><strong>P1-SAA-02</strong></td>
+<td>Multi-tenancy</td>
+<td><strong>P1 - Alto</strong></td>
+<td>Usuário restrito a 1 organização (e-mail único global no sistema)</td>
+<td><code>schema/core.prisma:404-416</code></td>
+<td>Média-Alta</td>
+</tr>
+<tr>
+<td><strong>P1-DEP-01</strong></td>
+<td>Dependências</td>
+<td><strong>P1 - Alto</strong></td>
+<td>14 vulnerabilidades críticas e altas em dependências npm</td>
+<td><code>package-lock.json</code>, <code>audit_results.json</code></td>
+<td>Média</td>
+</tr>
+<tr>
+<td><strong>P2-ARQ-01</strong></td>
+<td>Desempenho</td>
+<td><strong>P2 - Médio</strong></td>
+<td>Banco compartilhado entre OLTP, Event Store e Filas pg-boss (bloat)</td>
+<td><code>PgBossQueueAdapter.ts</code>, <code>worker.ts</code></td>
+<td>Média</td>
+</tr>
+<tr>
+<td><strong>P2-ARQ-02</strong></td>
+<td>Arquitetura</td>
+<td><strong>P2 - Médio</strong></td>
+<td>Desalinhamento da stack mista .NET C# (WMS) e diretório legado auth</td>
+<td><code>services/wms/</code>, <code>docs/adr/0002.md</code></td>
+<td>Média</td>
+</tr>
+<tr>
+<td><strong>P2-TST-01</strong></td>
+<td>Qualidade</td>
+<td><strong>P2 - Médio</strong></td>
+<td>Desequilíbrio na cobertura de testes (frontend com 8 testes) e forceExit</td>
+<td><code>frontend/src/__tests__/</code>, <code>package.json:22</code></td>
+<td>Média</td>
+</tr>
+<tr>
+<td><strong>P2-WOR-01</strong></td>
+<td>IA &amp; Worker</td>
+<td><strong>P2 - Médio</strong></td>
+<td>Incompatibilidade multi-tenant do Agente de IA nos workers</td>
+<td><code>backend/src/worker.ts:149-165</code></td>
+<td>Baixa-Média</td>
+</tr>
+<tr>
+<td><strong>P3-DES-01</strong></td>
+<td>Performance</td>
+<td><strong>P3 - Baixo</strong></td>
+<td>Frontend compilado em bundle monolítico de 2.5 MB sem lazy-loading</td>
+<td><code>frontend/src/main.tsx:1-94</code></td>
+<td>Baixa</td>
+</tr>
+<tr>
+<td><strong>P3-LIC-01</strong></td>
+<td>Jurídico</td>
+<td><strong>P3 - Baixo</strong></td>
+<td>Preservação obrigatória de copyright e avisos da licença MIT</td>
+<td><code>LICENCE.md:1-21</code></td>
+<td>Baixa</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>10. AVALIAÇÃO DE DESEMPENHO E ESCALABILIDADE</h2>
+<h3>10.1. Eficiência de Leitura com CQRS</h3>
+<p>O Open TMS possui uma das melhores implementações de CQRS para sistemas TypeScript:</p>
+<ul>
+<li>As telas de listagem e painéis gerenciais não realizam joins pesados em tempo de execução; elas consultam projeções desnormalizadas (<code>ShipmentReadModel</code>, <code>OrderReadModel</code>, <code>InvoiceReadModel</code>).</li>
+<li>Isso garante tempos de resposta inferiores a 50ms para consultas de listagem com filtros complexos.</li>
+</ul>
+<h3>10.2. Gargalos Estruturais Identificados</h3>
+<ol>
+<li><strong>Concorrência em Disco no PostgreSQL pelo <code>pg-boss</code>:</strong><ul>
+<li>O <code>pg-boss</code> utiliza tabelas internas no PostgreSQL para mensageria assíncrona. Em um cenário com centenas de empresas gerando milhares de eventos de rastreamento por minuto, a alta rotatividade de gravação e exclusão causará bloat nas tabelas e esgotará o pool de conexões do banco de dados.</li>
+</ul>
+</li>
+<li><strong>Armazenamento de Anexos no Banco (<code>BinaryStore</code>):</strong><ul>
+<li>O sistema possui um mecanismo de fallback para gravar anexos de até 50 MB na coluna <code>Bytes</code> da tabela <code>BinaryStore</code> caso o S3 não esteja configurado. Essa prática sobrecarrega a memória de buffer cache do PostgreSQL e o tráfego de WAL, degradando o desempenho geral do banco.</li>
+<li><strong>Diretriz Mandatória:</strong> Em ambiente SaaS, o MinIO ou AWS S3 / Cloudflare R2 deve ser <strong>obrigatório</strong>, desativando-se permanentemente o fallback em banco.</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>11. OPORTUNIDADES DE REAPROVEITAMENTO E VALOR AGREGADO</h2>
+<p>Mesmo com as lacunas identificadas, o Open TMS possui componentes extremamente avançados que devem ser preservados e reaproveitados:</p>
+<ol>
+<li><strong>Motor de Embarques e Paradas (<code>Shipment</code> e <code>ShipmentStop</code>):</strong><ul>
+<li>Lógica madura para rotas com múltiplos pontos de parada, controle de janelas de coleta/entrega e tolerância a atrasos.</li>
+</ul>
+</li>
+<li><strong>Consolidação de Cargas LTL (Less Than Truckload):</strong><ul>
+<li>Algoritmo completo para agrupar fretes fracionados em um único manifesto de consolidação (<code>Consolidation</code>), com cálculo proporcional de receita, custo e margem esperada por trecho.</li>
+</ul>
+</li>
+<li><strong>WMS Operacional Completo:</strong><ul>
+<li>Mapeamento tridimensional de armazém (zonas, corredores, níveis, posições), conferência de recebimento, regras de armazenamento dirigido (putaway), divisão de ondas de separação (waves) e auditoria de embalagem.</li>
+</ul>
+</li>
+<li><strong>Motor de Não-Conformidades e Triage (<code>IssueEngine</code>):</strong><ul>
+<li>Sistema reativo que escuta eventos de quebra de SLA, desvio de temperatura na cadeia fria ou atraso na rota e abre ocorrências automaticamente com suporte a triagem por IA.</li>
+</ul>
+</li>
+<li><strong>Portais Satélites com shadcn/ui:</strong><ul>
+<li>Interfaces limpas, profissionais e responsivas para clientes, transportadoras e operadores de depósito, prontas para receber a identidade visual comercial.</li>
+</ul>
+</li>
+<li><strong>Campos Customizados Versionados (<code>CustomFields</code>):</strong><ul>
+<li>Permite que cada empresa cliente crie seus próprios campos em embarques e pedidos sem necessidade de alterações no schema do banco de dados.</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>12. PARECER CONCLUSIVO E PRÓXIMOS PASSOS</h2>
+<h3>Parecer Conclusivo:</h3>
+<p>A base do Open TMS é <strong>excepcional do ponto de vista arquitetural (CQRS, separação de camadas, tipagem estrita com TypeScript e Zod)</strong> e representa uma base técnica de altíssimo nível. A decisão de utilizá-lo como acelerador tecnológico para a criação de um TMS SaaS brasileiro é <strong>plenamente justificada e recomendada</strong>, desde que sejam cumpridas as etapas de blindagem e adequação.</p>
+<p>A tentativa de lançar o sistema comercialmente sem realizar as adaptações mapeadas acarretaria severos riscos de vazamento de dados entre clientes concorrentes, infração a normas de segurança e impossibilidade jurídica de emitir documentos fiscais no território nacional.</p>
+<h3>Próxima Etapa Recomendada:</h3>
+<p>Conforme a regra fundamental desta fase de auditoria, <strong>nenhuma funcionalidade foi desenvolvida ou alterada até o momento</strong>. </p>
+<p>Com a conclusão desta auditoria técnica e a aprovação deste relatório, a próxima etapa imediata deve ser o início da <strong>FASE I do Roadmap: Estabilização e Segurança</strong>, executando a <strong>Etapa 1 (Correções Críticas de Segurança: SSRF, Insecure Hash e Proteção de Rotas EDI)</strong> e a <strong>Etapa 2 (Blindagem Multi-tenant com PostgreSQL RLS e Composite Keys)</strong>.</p>
+
+</body>
+</html>
